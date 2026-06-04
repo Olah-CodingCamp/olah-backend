@@ -1,18 +1,32 @@
 const nodemailer = require("nodemailer");
 
-// Log konfigurasi email saat startup (tanpa menampilkan password)
-console.log("[Mailer] EMAIL_USER:", process.env.EMAIL_USER ? `${process.env.EMAIL_USER.slice(0, 4)}****` : "❌ TIDAK DISET");
-console.log("[Mailer] EMAIL_PASS:", process.env.EMAIL_PASS ? "✅ Diset" : "❌ TIDAK DISET");
+const createTransporter = () => {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+  // Log saat transporter dibuat (setiap pengiriman)
+  console.log("[Mailer] EMAIL_USER:", user ? `${user.slice(0, 4)}****` : "❌ TIDAK DISET");
+  console.log("[Mailer] EMAIL_PASS:", pass ? "✅ Diset" : "❌ TIDAK DISET");
+
+  if (!user || !pass) {
+    throw new Error("EMAIL_USER atau EMAIL_PASS tidak dikonfigurasi di environment variables.");
+  }
+
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+};
 
 const sendOtpEmail = async (toEmail, otp) => {
+  const transporter = createTransporter();
+
+  // Verifikasi koneksi SMTP sebelum kirim
+  await transporter.verify().catch((err) => {
+    console.error("[Mailer] ❌ Gagal verifikasi SMTP:", err.message);
+    throw new Error(`Konfigurasi SMTP tidak valid: ${err.message}`);
+  });
+
   try {
     const info = await transporter.sendMail({
       from: `"Olah App" <${process.env.EMAIL_USER}>`,
@@ -30,12 +44,12 @@ const sendOtpEmail = async (toEmail, otp) => {
         </div>
       `,
     });
-    console.log("[Mailer] Email OTP berhasil dikirim ke:", toEmail, "| MessageId:", info.messageId);
+    console.log("[Mailer] ✅ Email OTP berhasil dikirim ke:", toEmail, "| MessageId:", info.messageId);
   } catch (error) {
     console.error("[Mailer] ❌ Gagal mengirim email OTP ke:", toEmail);
     console.error("[Mailer] Error code:", error.code);
     console.error("[Mailer] Error message:", error.message);
-    throw error; // re-throw agar controller bisa handle
+    throw error;
   }
 };
 

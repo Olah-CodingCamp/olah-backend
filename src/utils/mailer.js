@@ -1,36 +1,24 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const createTransporter = () => {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+const getResendClient = () => {
+  const apiKey = process.env.RESEND_API_KEY;
 
-  // Log saat transporter dibuat (setiap pengiriman)
-  console.log("[Mailer] EMAIL_USER:", user ? `${user.slice(0, 4)}****` : "❌ TIDAK DISET");
-  console.log("[Mailer] EMAIL_PASS:", pass ? "✅ Diset" : "❌ TIDAK DISET");
+  console.log("[Mailer] RESEND_API_KEY:", apiKey ? `${apiKey.slice(0, 6)}****` : "❌ TIDAK DISET");
 
-  if (!user || !pass) {
-    throw new Error("EMAIL_USER atau EMAIL_PASS tidak dikonfigurasi di environment variables.");
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY tidak dikonfigurasi di environment variables.");
   }
 
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
+  return new Resend(apiKey);
 };
 
 const sendOtpEmail = async (toEmail, otp) => {
-  const transporter = createTransporter();
-
-  // Verifikasi koneksi SMTP sebelum kirim
-  await transporter.verify().catch((err) => {
-    console.error("[Mailer] ❌ Gagal verifikasi SMTP:", err.message);
-    throw new Error(`Konfigurasi SMTP tidak valid: ${err.message}`);
-  });
+  const resend = getResendClient();
 
   try {
-    const info = await transporter.sendMail({
-      from: `"Olah App" <${process.env.EMAIL_USER}>`,
-      to: toEmail,
+    const { data, error } = await resend.emails.send({
+      from: "Olah App <onboarding@resend.dev>",
+      to: [toEmail],
       subject: "Kode OTP Ubah Kata Sandi",
       html: `
         <div style="font-family:sans-serif;max-width:400px;margin:auto">
@@ -44,10 +32,15 @@ const sendOtpEmail = async (toEmail, otp) => {
         </div>
       `,
     });
-    console.log("[Mailer] ✅ Email OTP berhasil dikirim ke:", toEmail, "| MessageId:", info.messageId);
+
+    if (error) {
+      console.error("[Mailer] ❌ Resend error:", error);
+      throw new Error(error.message || "Gagal mengirim email via Resend.");
+    }
+
+    console.log("[Mailer] ✅ Email OTP berhasil dikirim ke:", toEmail, "| ID:", data?.id);
   } catch (error) {
     console.error("[Mailer] ❌ Gagal mengirim email OTP ke:", toEmail);
-    console.error("[Mailer] Error code:", error.code);
     console.error("[Mailer] Error message:", error.message);
     throw error;
   }

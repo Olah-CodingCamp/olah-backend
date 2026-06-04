@@ -93,9 +93,9 @@ const login = async (req, res) => {
     );
 
     if (!user) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
-        message: "Email belum terdaftar.",
+        message: "Email atau password salah.",
       });
     }
 
@@ -204,7 +204,7 @@ const forgotPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email wajib diisi." });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordResetOtp +passwordResetOtpExpiry");
 
     // Selalu response sukses agar tidak bocorkan info email terdaftar atau tidak
     if (!user) {
